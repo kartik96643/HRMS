@@ -39,7 +39,10 @@ const Tasks = () => {
   const [submitLoading, setSubmitLoading] = useState(false);
 
   // Review Task Form State
-  const [rating, setRating] = useState(5);
+  const [ratingQuality, setRatingQuality] = useState(4);
+  const [ratingTeamwork, setRatingTeamwork] = useState(4);
+  const [ratingComm, setRatingComm] = useState(4);
+  const [ratingProductivity, setRatingProductivity] = useState(4);
   const [feedback, setFeedback] = useState('');
   const [reviewLoading, setReviewLoading] = useState(false);
 
@@ -130,7 +133,10 @@ const Tasks = () => {
   // Open review modal
   const openReviewModal = (task) => {
     setSelectedTask(task);
-    setRating(5);
+    setRatingQuality(4);
+    setRatingTeamwork(4);
+    setRatingComm(4);
+    setRatingProductivity(4);
     setFeedback('');
     setIsReviewModalOpen(true);
   };
@@ -138,7 +144,7 @@ const Tasks = () => {
   // Handle task review submission (Supervisor action)
   const handleReviewTaskSubmit = async (e) => {
     e.preventDefault();
-    if (rating === undefined || !feedback || !selectedTask) return;
+    if (!feedback || !selectedTask) return;
 
     setReviewLoading(true);
     setError('');
@@ -146,7 +152,12 @@ const Tasks = () => {
 
     try {
       const { data } = await api.put(`/tasks/${selectedTask._id}/review`, {
-        rating,
+        ratings: {
+          quality: Number(ratingQuality),
+          teamwork: Number(ratingTeamwork),
+          communication: Number(ratingComm),
+          productivity: Number(ratingProductivity)
+        },
         feedback
       });
       setTasks(tasks.map(t => t._id === selectedTask._id ? data : t));
@@ -458,26 +469,71 @@ const Tasks = () => {
               <X size={20} />
             </button>
             <h2 className="text-xl font-bold text-white mb-2">Rate & Close Task</h2>
-            <p className="text-[11px] text-slate-450 text-slate-400 mb-6">Task: <span className="text-white font-bold">{selectedTask.title}</span></p>
+            <p className="text-[11px] text-slate-400 mb-6">Task: <span className="text-white font-bold">{selectedTask.title}</span></p>
 
             <form onSubmit={handleReviewTaskSubmit} className="space-y-4">
-              <div>
-                <label className="block text-[10px] font-semibold text-slate-400 uppercase mb-2">Performance Rating (1 - 5 Stars)</label>
-                <div className="flex items-center gap-2 p-3 bg-slate-950 border border-slate-850 rounded-xl">
-                  {[1, 2, 3, 4, 5].map(star => (
-                    <button
-                      key={star}
-                      type="button"
-                      onClick={() => setRating(star)}
-                      className="text-slate-600 hover:text-amber-400 transition"
-                    >
-                      <Star 
-                        size={22} 
-                        className={star <= rating ? 'fill-amber-500 text-amber-500' : 'text-slate-700'} 
-                      />
-                    </button>
-                  ))}
-                  <span className="ml-4 font-bold text-sm text-primary-400">{rating} out of 5</span>
+              {/* Ratings block (1-5 sliders) */}
+              <div className="space-y-3 p-3.5 bg-slate-950 border border-slate-850 rounded-xl">
+                <span className="block text-[9px] font-bold text-slate-500 uppercase tracking-wider mb-2">Performance Metrics (1 - 5 Scale)</span>
+
+                <div className="flex items-center justify-between text-xs text-slate-350">
+                  <span className="font-medium">Work Quality:</span>
+                  <div className="flex items-center gap-2">
+                    <input 
+                      type="range" 
+                      min="1" 
+                      max="5" 
+                      value={ratingQuality} 
+                      onChange={(e) => setRatingQuality(e.target.value)} 
+                      className="w-24 accent-primary-500 h-1 bg-slate-800 rounded cursor-pointer" 
+                    />
+                    <span className="font-bold text-primary-400 w-4 text-right">{ratingQuality}</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between text-xs text-slate-350">
+                  <span className="font-medium">Teamwork:</span>
+                  <div className="flex items-center gap-2">
+                    <input 
+                      type="range" 
+                      min="1" 
+                      max="5" 
+                      value={ratingTeamwork} 
+                      onChange={(e) => setRatingTeamwork(e.target.value)} 
+                      className="w-24 accent-primary-500 h-1 bg-slate-800 rounded cursor-pointer" 
+                    />
+                    <span className="font-bold text-primary-400 w-4 text-right">{ratingTeamwork}</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between text-xs text-slate-350">
+                  <span className="font-medium">Communication:</span>
+                  <div className="flex items-center gap-2">
+                    <input 
+                      type="range" 
+                      min="1" 
+                      max="5" 
+                      value={ratingComm} 
+                      onChange={(e) => setRatingComm(e.target.value)} 
+                      className="w-24 accent-primary-500 h-1 bg-slate-800 rounded cursor-pointer" 
+                    />
+                    <span className="font-bold text-primary-400 w-4 text-right">{ratingComm}</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between text-xs text-slate-350">
+                  <span className="font-medium">Productivity:</span>
+                  <div className="flex items-center gap-2">
+                    <input 
+                      type="range" 
+                      min="1" 
+                      max="5" 
+                      value={ratingProductivity} 
+                      onChange={(e) => setRatingProductivity(e.target.value)} 
+                      className="w-24 accent-primary-500 h-1 bg-slate-800 rounded cursor-pointer" 
+                    />
+                    <span className="font-bold text-primary-400 w-4 text-right">{ratingProductivity}</span>
+                  </div>
                 </div>
               </div>
 
@@ -488,7 +544,7 @@ const Tasks = () => {
                   rows="3"
                   value={feedback}
                   onChange={(e) => setFeedback(e.target.value)}
-                  placeholder="Provide brief feedback on the quality, speed, and accuracy of this task output..."
+                  placeholder="Provide feedback on the quality, speed, communication and accuracy of this task output..."
                   className="w-full bg-slate-950 border border-slate-800 focus:border-primary-500 rounded-xl py-2 px-3 text-white text-xs outline-none resize-none transition"
                 />
               </div>

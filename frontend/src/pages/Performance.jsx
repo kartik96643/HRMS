@@ -1,15 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import api from '../utils/api';
 import { useAuth } from '../context/AuthContext';
-import { 
-  LineChart, 
-  Plus, 
-  Trash, 
-  Award, 
-  AlertCircle, 
-  Check, 
-  Sparkles, 
-  User, 
+import {
+  LineChart,
+  Plus,
+  Trash,
+  Award,
+  AlertCircle,
+  Check,
+  Sparkles,
+  User,
   FileText,
   TrendingUp,
   Target,
@@ -32,10 +32,10 @@ const Performance = () => {
   // Creator Form States
   const [selectedEmp, setSelectedEmp] = useState('');
   const [feedback, setFeedback] = useState('');
-  
+
   // Goals array inputs
   const [goalsInput, setGoalsInput] = useState(['']);
-  
+
   // Rating fields (1-5 scale)
   const [ratingQuality, setRatingQuality] = useState(4);
   const [ratingTeamwork, setRatingTeamwork] = useState(4);
@@ -132,7 +132,7 @@ const Performance = () => {
 
     setFormLoading(true);
     setFormSuccess('');
-    setCreatedSummary(null);
+    // setCreatedSummary(null);
 
     // Filter out empty goals
     const filteredGoals = goalsInput.filter(g => g.trim() !== '');
@@ -152,10 +152,10 @@ const Performance = () => {
     try {
       const { data } = await api.post('/performance', payload);
       setFormSuccess('Performance review completed successfully!');
-      
+
       // Store summary to display as result panel
       setCreatedSummary(data);
-      
+
       // Clear inputs
       setFeedback('');
       setGoalsInput(['']);
@@ -163,7 +163,7 @@ const Performance = () => {
       setRatingTeamwork(4);
       setRatingComm(4);
       setRatingProductivity(4);
-      
+
       // If matching selected manager query, refresh history
       if (selectedEmp === activeEmployeeId) {
         fetchReviews(activeEmployeeId);
@@ -180,7 +180,7 @@ const Performance = () => {
     const newStatus = currentStatus === 'Pending' ? 'Completed' : 'Pending';
     try {
       await api.put(`/performance/goal/${reviewId}/${goalIdx}`, { status: newStatus });
-      
+
       // Refresh current records list
       if (isManager) {
         fetchReviews(activeEmployeeId);
@@ -203,8 +203,8 @@ const Performance = () => {
       <div>
         <h1 className="text-2xl font-extrabold text-white">Performance Management</h1>
         <p className="text-slate-400 text-sm mt-1">
-          {isManager 
-            ? 'Complete employee appraisals, track goals, and generate AI performance summaries.' 
+          {isManager
+            ? 'Complete employee appraisals, track goals, and generate AI performance summaries.'
             : 'Track your objectives, review feedback, and view AI developmental reports.'}
         </p>
       </div>
@@ -223,11 +223,11 @@ const Performance = () => {
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          
+
           {/* MANAGER ONLY VIEW: WRITE APPRAISALS */}
           {isManager && (
             <div className="lg:col-span-1 space-y-6">
-              
+
               {/* Creator Card */}
               <div className="glass p-6 rounded-2xl border border-slate-800/60 text-left">
                 <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
@@ -260,7 +260,7 @@ const Performance = () => {
                   {/* Ratings blocks (1-5 sliders) */}
                   <div className="space-y-3 p-3 bg-slate-950 border border-slate-850 rounded-xl">
                     <span className="block text-[9px] font-bold text-slate-500 uppercase tracking-wider mb-2">Metrics (1 - 5 Scale)</span>
-                    
+
                     <div className="flex items-center justify-between text-xs text-slate-300">
                       <span>Work Quality:</span>
                       <div className="flex items-center gap-2">
@@ -298,15 +298,15 @@ const Performance = () => {
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <label className="block text-[10px] font-semibold text-slate-400 uppercase">Set OKR Goals</label>
-                      <button 
-                        type="button" 
+                      <button
+                        type="button"
                         onClick={handleAddGoalInput}
                         className="text-[10px] text-primary-400 hover:text-primary-300 font-bold"
                       >
                         + Add Goal
                       </button>
                     </div>
-                    
+
                     <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
                       {goalsInput.map((goal, idx) => (
                         <div key={idx} className="flex gap-2">
@@ -355,14 +355,14 @@ const Performance = () => {
               </div>
 
               {/* Real-time generated AI Summary Preview */}
-              {createdSummary && (
+              {/* {createdSummary && (
                 <div className="glass p-5 rounded-2xl border border-primary-500/20 bg-primary-500/5 text-left space-y-4">
                   <div className="flex items-center justify-between border-b border-slate-800 pb-2">
                     <h4 className="text-xs font-bold text-white flex items-center gap-1.5">
                       <Sparkles className="text-amber-500 animate-pulse" size={13} /> Generated AI Performance Summary
                     </h4>
                   </div>
-                  
+
                   <div className="space-y-3 text-xs leading-normal">
                     <p className="text-slate-350 pr-2 break-words text-slate-300">
                       {createdSummary.aiSummary?.overallSummary}
@@ -385,14 +385,14 @@ const Performance = () => {
                     </div>
                   </div>
                 </div>
-              )}
+              )} */}
 
             </div>
           )}
 
           {/* APPRAISALS HISTORY & OBJECTIVES VIEW */}
           <div className={`${isManager ? 'lg:col-span-2' : 'lg:col-span-3'} space-y-6`}>
-            
+
             {/* Manager Filter Search Header */}
             {isManager && (
               <div className="glass p-5 rounded-2xl border border-slate-800/60 flex items-center justify-between gap-4 text-left">
@@ -427,7 +427,7 @@ const Performance = () => {
                     </h4>
                     <span className="text-[9px] text-slate-500 dark:text-slate-400 font-bold">Auto-calculated metrics</span>
                   </div>
-                  
+
                   <div className="space-y-1">
                     <span className="text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase block">Task Completion Rate</span>
                     <div className="flex items-center gap-3">
@@ -445,10 +445,10 @@ const Performance = () => {
                       <span className="text-2xl font-black text-slate-800 dark:text-white">{taskMetrics.averageRating} / 5</span>
                       <div className="flex items-center text-amber-500">
                         {[1, 2, 3, 4, 5].map(star => (
-                          <Star 
-                            key={star} 
-                            size={12} 
-                            className={star <= Math.round(taskMetrics.averageRating) ? 'fill-amber-500 text-amber-500' : 'text-slate-300 dark:text-slate-800'} 
+                          <Star
+                            key={star}
+                            size={12}
+                            className={star <= Math.round(taskMetrics.averageRating) ? 'fill-amber-500 text-amber-500' : 'text-slate-300 dark:text-slate-800'}
                           />
                         ))}
                       </div>
@@ -472,7 +472,7 @@ const Performance = () => {
               {reviews.length > 0 ? (
                 reviews.map((rev) => (
                   <div key={rev._id} className="glass rounded-2xl border border-slate-800/65 overflow-hidden text-left relative">
-                    
+
                     {/* Header info */}
                     <div className="px-6 py-4 bg-slate-900/30 border-b border-slate-850 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                       <div className="flex items-center gap-3">
@@ -491,13 +491,13 @@ const Performance = () => {
 
                     {/* Appraisals stats and graphs */}
                     <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-8 border-b border-slate-850">
-                      
+
                       {/* Ratings chart */}
                       <div className="space-y-4">
                         <h5 className="text-[10px] font-bold text-slate-450 uppercase tracking-widest text-slate-400 flex items-center gap-1.5">
                           <TrendingUp size={13} className="text-primary-500" /> Rated Metrics
                         </h5>
-                        
+
                         <div className="space-y-3">
                           {/* Rating 1 */}
                           <div className="space-y-1">
@@ -547,22 +547,20 @@ const Performance = () => {
                         <h5 className="text-[10px] font-bold text-slate-450 uppercase tracking-widest text-slate-400 flex items-center gap-1.5">
                           <Target size={13} className="text-amber-500 animate-pulse" /> Active OKR Goals Checklist
                         </h5>
-                        
+
                         <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
                           {rev.goals?.map((goal, idx) => (
-                            <div 
+                            <div
                               key={idx}
                               onClick={() => handleToggleGoal(rev._id, idx, goal.status, rev.employee?._id)}
-                              className={`p-2.5 rounded-xl border cursor-pointer flex items-center justify-between text-xs transition ${
-                                goal.status === 'Completed'
-                                  ? 'bg-emerald-500/5 border-emerald-500/15 text-emerald-400 line-through'
-                                  : 'bg-slate-950 border-slate-850 text-slate-300 hover:border-slate-800'
-                              }`}
+                              className={`p-2.5 rounded-xl border cursor-pointer flex items-center justify-between text-xs transition ${goal.status === 'Completed'
+                                ? 'bg-emerald-500/5 border-emerald-500/15 text-emerald-400 line-through'
+                                : 'bg-slate-950 border-slate-850 text-slate-300 hover:border-slate-800'
+                                }`}
                             >
                               <span>{goal.text}</span>
-                              <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold ${
-                                goal.status === 'Completed' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-slate-800 text-slate-500'
-                              }`}>
+                              <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold ${goal.status === 'Completed' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-slate-800 text-slate-500'
+                                }`}>
                                 {goal.status}
                               </span>
                             </div>
@@ -577,7 +575,7 @@ const Performance = () => {
 
                     {/* AI report expansion */}
                     <div className="p-6 bg-slate-900/10 space-y-4">
-                      
+
                       {/* Overall Comments */}
                       <div className="space-y-1.5">
                         <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block flex items-center gap-1"><FileText size={11} /> Manager Remarks Feedback</span>
@@ -592,7 +590,7 @@ const Performance = () => {
                           <Sparkles className="text-amber-500 animate-pulse" size={13} />
                           <span className="text-[10px] text-white font-extrabold uppercase tracking-wide">AI Performance Report Summary</span>
                         </div>
-                        
+
                         <p className="text-xs text-slate-300 leading-relaxed">
                           {rev.aiSummary?.overallSummary}
                         </p>
@@ -625,8 +623,8 @@ const Performance = () => {
                 <div className="glass p-10 rounded-3xl border border-slate-800/60 text-center space-y-3">
                   <LineChart size={36} className="text-slate-600 mx-auto" />
                   <p className="text-xs text-slate-500 font-medium">
-                    {isManager 
-                      ? 'Select an employee from the dropdown list to review logs.' 
+                    {isManager
+                      ? 'Select an employee from the dropdown list to review logs.'
                       : 'No performance reviews published for your account.'}
                   </p>
                 </div>

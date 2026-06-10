@@ -1,5 +1,5 @@
 const { PDFParse } = require('pdf-parse');
-const { OpenAI } = require('openai');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 // Pre-existing mock fallback logic
 const mockParser = (candidateName, email, jobRequirements = []) => {
@@ -58,11 +58,11 @@ const mockParser = (candidateName, email, jobRequirements = []) => {
 };
 
 const parseResumeAndScore = async (candidateName, email, jobRequirements = [], file = null) => {
-  const apiKey = process.env.OPENAI_API_KEY;
-  const isOpenAIConfigured = apiKey && apiKey !== 'your_openai_api_key_here' && apiKey.startsWith('sk-');
+  const apiKey = process.env.GEMINI_API_KEY;
+  const isGeminiConfigured = apiKey && apiKey.trim() !== '' && apiKey.trim() !== 'your_gemini_api_key_here';
 
-  if (!isOpenAIConfigured) {
-    console.warn('OpenAI key not configured or using placeholders. Using mock fallback parser.');
+  if (!isGeminiConfigured) {
+    console.warn('Gemini API key not configured or using placeholders. Using mock fallback parser.');
     return mockParser(candidateName, email, jobRequirements);
   }
 
@@ -83,47 +83,77 @@ const parseResumeAndScore = async (candidateName, email, jobRequirements = [], f
       resumeText = 'No file uploaded. Parsing profile metadata only.';
     }
 
-    // 2. Query OpenAI API
-    const openai = new OpenAI({ apiKey });
+    // 2. Query Gemini API
+    const genAI = new GoogleGenerativeAI(apiKey.trim());
+
+    // Using gemini-2.5-flash which is supported by the API key and supports JSON schema
+    const model = genAI.getGenerativeModel({
+      model: 'gemini-2.5-flash',
+      generationConfig: {
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: 'object',
+          properties: {
+            extractedInfo: {
+              type: 'object',
+              properties: {
+                skills: {
+                  type: 'array',
+                  items: { type: 'string' }
+                },
+                experience: { type: 'string' },
+                education: { type: 'string' },
+                certifications: {
+                  type: 'array',
+                  items: { type: 'string' }
+                }
+              },
+              required: ['skills', 'experience', 'education', 'certifications']
+            },
+            aiMatch: {
+              type: 'object',
+              properties: {
+                matchPercentage: { type: 'integer' },
+                matchingSkills: {
+                  type: 'array',
+                  items: { type: 'string' }
+                },
+                missingSkills: {
+                  type: 'array',
+                  items: { type: 'string' }
+                },
+                candidateSummary: { type: 'string' }
+              },
+              required: ['matchPercentage', 'matchingSkills', 'missingSkills', 'candidateSummary']
+            }
+          },
+          required: ['extractedInfo', 'aiMatch']
+        }
+      }
+    });
+
     const systemPrompt = `You are an expert HR recruiter and AI parsing system.
-Analyze the candidate's resume text and calculate their fit match percentage against the specified job requirements.
-You MUST respond with a valid JSON object matching this schema exactly:
-{
-  "extractedInfo": {
-    "skills": ["string"],
-    "experience": "string summarizing work history length and roles",
-    "education": "string summarizing degrees and colleges",
-    "certifications": ["string"]
-  },
-  "aiMatch": {
-    "matchPercentage": number (0 to 100 representing job requirements fit),
-    "matchingSkills": ["string of skills present in job requirements"],
-    "missingSkills": ["string of skills missing from job requirements"],
-    "candidateSummary": "string summarizing candidate strengths and gaps"
-  }
-}`;
+Analyze the candidate's resume text and calculate their fit match percentage against the specified job requirements.`;
 
     const userPrompt = `Candidate Name: ${candidateName}
 Email: ${email}
 Job Requirements: ${JSON.stringify(jobRequirements)}
 Resume Text:
-${resumeText.substring(0, 8000)}`; // limit size to keep token count reasonable
+${resumeText.substring(0, 8000)}`;
 
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt }
-      ],
-      response_format: { type: "json_object" }
+    const result = await model.generateContent({
+      contents: [
+        { role: 'user', parts: [{ text: systemPrompt + '\n\n' + userPrompt }] }
+      ]
     });
 
-    const result = JSON.parse(response.choices[0].message.content);
-    return result;
+    const responseText = result.response.text();
+    const parsedResult = JSON.parse(responseText);
+    return parsedResult;
 
   } catch (error) {
-    console.error('OpenAI Resume Parsing Error:', error.message);
-    console.warn('Falling back to mock parser due to OpenAI error.');
+    console.error('Gemini Resume Parsing Error:', error.message);
+    console.warn('Falling back to mock parser due to Gemini error.');
     return mockParser(candidateName, email, jobRequirements);
   }
 };

@@ -1,7 +1,9 @@
 const Task = require('../models/Task');
 const User = require('../models/User');
 const Department = require('../models/Department');
+const Performance = require('../models/Performance');
 const { sendNotification } = require('../utils/notificationHelper');
+const { generatePerformanceSummary } = require('../utils/aiSummary');
 
 // Helper to calculate task performance metrics
 const calculateTaskMetrics = async (userId) => {
@@ -185,16 +187,50 @@ const updateTaskStatus = async (req, res) => {
 // @route   PUT /api/tasks/:id/review
 // @access  Private (Admin, HR, Manager)
 const reviewTask = async (req, res) => {
-  const { rating, feedback } = req.body;
+  const { rating, ratings, feedback } = req.body;
 
   try {
-    if (rating === undefined || !feedback) {
-      return res.status(400).json({ message: 'Rating and feedback are required' });
+    if (!feedback) {
+      return res.status(400).json({ message: 'Feedback is required' });
     }
 
-    const ratingNum = Number(rating);
-    if (isNaN(ratingNum) || ratingNum < 1 || ratingNum > 5) {
-      return res.status(400).json({ message: 'Rating must be a number between 1 and 5' });
+    let finalRatings;
+    let avgRating;
+
+    if (ratings) {
+      const { quality, teamwork, communication, productivity } = ratings;
+      if (
+        quality === undefined || teamwork === undefined ||
+        communication === undefined || productivity === undefined
+      ) {
+        return res.status(400).json({ message: 'All ratings (quality, teamwork, communication, productivity) are required' });
+      }
+
+      const q = Number(quality);
+      const t = Number(teamwork);
+      const c = Number(communication);
+      const p = Number(productivity);
+
+      if (
+        isNaN(q) || q < 1 || q > 5 ||
+        isNaN(t) || t < 1 || t > 5 ||
+        isNaN(c) || c < 1 || c > 5 ||
+        isNaN(p) || p < 1 || p > 5
+      ) {
+        return res.status(400).json({ message: 'All ratings must be numbers between 1 and 5' });
+      }
+
+      finalRatings = { quality: q, teamwork: t, communication: c, productivity: p };
+      avgRating = (q + t + c + p) / 4;
+    } else if (rating !== undefined) {
+      const ratingNum = Number(rating);
+      if (isNaN(ratingNum) || ratingNum < 1 || ratingNum > 5) {
+        return res.status(400).json({ message: 'Rating must be a number between 1 and 5' });
+      }
+      finalRatings = { quality: ratingNum, teamwork: ratingNum, communication: ratingNum, productivity: ratingNum };
+      avgRating = ratingNum;
+    } else {
+      return res.status(400).json({ message: 'Rating/ratings and feedback are required' });
     }
 
     const task = await Task.findById(req.params.id);
@@ -215,16 +251,37 @@ const reviewTask = async (req, res) => {
       return res.status(403).json({ message: 'Not authorized to review this task' });
     }
 
-    task.rating = ratingNum;
+    task.rating = avgRating;
     task.feedback = feedback;
 
     await task.save();
 
-    // Notify employee about task feedback
+    // Automatically create a Performance review
+    // Calculate current task metrics to augment the review (including the newly rated task)
+    const metrics = await calculateTaskMetrics(task.assignedTo);
+    const augmentedFeedback = `[Task Completion: ${metrics.completionRate}%, Avg Grade: ${metrics.averageRating}/5, On-Time: ${metrics.onTimeCompletionRate}%]. Task: "${task.title}". ${feedback}`;
+    const aiSummary = generatePerformanceSummary(finalRatings, augmentedFeedback);
+
+    await Performance.create({
+      employee: task.assignedTo,
+      reviewer: req.user._id,
+      ratings: finalRatings,
+      feedback: `Task Review: "${task.title}" - ${feedback}`,
+      aiSummary,
+      goals: []
+    });
+
+    // Notify employee about task feedback and new performance review
     await sendNotification(
       task.assignedTo,
       'TaskReviewed',
-      `Your task "${task.title}" has been reviewed by ${req.user.name}. Grade: ${ratingNum}/5`
+      `Your task "${task.title}" has been reviewed by ${req.user.name}. Grade: ${Math.round(avgRating * 10) / 10}/5`
+    );
+
+    await sendNotification(
+      task.assignedTo,
+      'PerformanceReview',
+      `A new performance review has been published from your task evaluation by ${req.user.name}`
     );
 
     const populatedTask = await Task.findById(task._id)

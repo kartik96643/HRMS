@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useForm } from 'react-hook-form';
 import { useAuth } from '../context/AuthContext';
 import {
   Building,
@@ -29,6 +30,54 @@ const Landing = () => {
 
   const toggleFaq = (index) => {
     setOpenFaq(openFaq === index ? null : index);
+  };
+
+  // React Hook Form & Web3Forms State
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors, isSubmitting }
+  } = useForm({
+    mode: 'onTouched'
+  });
+
+  const [submitStatus, setSubmitStatus] = useState({ success: null, message: '' });
+
+  const onContactSubmit = async (data) => {
+    setSubmitStatus({ success: null, message: '' });
+    try {
+      const response = await fetch('https://api.web3forms.com/submit', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+          access_key: '572733a3-a53d-4e29-b0e6-096704ed923d',
+          ...data
+        })
+      });
+      const result = await response.json();
+      if (result.success) {
+        setSubmitStatus({
+          success: true,
+          message: 'Thank you! Your message has been sent successfully.'
+        });
+        reset();
+      } else {
+        setSubmitStatus({
+          success: false,
+          message: result.message || 'Something went wrong. Please try again.'
+        });
+      }
+    } catch (err) {
+      console.error('Web3Forms Error:', err);
+      setSubmitStatus({
+        success: false,
+        message: 'Network error. Please check your connection and try again.'
+      });
+    }
   };
 
   const featuresList = [
@@ -531,42 +580,94 @@ const Landing = () => {
           {/* Contact Input Form */}
           <div className="glass p-6 md:p-8 rounded-3xl border border-slate-800/60 space-y-4">
             <h4 className="text-base font-bold text-white flex items-center gap-2"><MessageSquare size={16} className="text-primary-500" /> Send a Message</h4>
-            <form onSubmit={(e) => { e.preventDefault(); alert('Thank you for contacting us! We will get back to you shortly.'); }} className="space-y-4">
+            
+            {submitStatus.message && (
+              <div className={`p-4 rounded-xl text-xs font-semibold border ${
+                submitStatus.success 
+                  ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' 
+                  : 'bg-red-500/10 border-red-500/20 text-red-400'
+              }`}>
+                {submitStatus.message}
+              </div>
+            )}
+
+            <form onSubmit={handleSubmit(onContactSubmit)} className="space-y-4" noValidate>
               <div>
                 <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Your Name</label>
                 <input
                   type="text"
-                  required
                   placeholder="John Doe"
-                  className="w-full bg-slate-950 border border-slate-800 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 rounded-xl py-2.5 px-4 text-slate-200 placeholder-slate-650 text-sm outline-none transition"
+                  className={`w-full bg-slate-950 border rounded-xl py-2.5 px-4 text-slate-200 placeholder-slate-650 text-sm outline-none transition focus:ring-1 ${
+                    errors.name 
+                      ? 'border-red-500/50 focus:border-red-500 focus:ring-red-500/30' 
+                      : 'border-slate-800 focus:border-primary-500 focus:ring-primary-500/30'
+                  }`}
+                  {...register('name', {
+                    required: 'Name is required',
+                    minLength: { value: 2, message: 'Name must be at least 2 characters' }
+                  })}
                 />
+                {errors.name && (
+                  <p className="text-red-400 text-xs mt-1.5 font-medium">{errors.name.message}</p>
+                )}
               </div>
 
               <div>
                 <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Email Address</label>
                 <input
                   type="email"
-                  required
                   placeholder="john@company.com"
-                  className="w-full bg-slate-950 border border-slate-800 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 rounded-xl py-2.5 px-4 text-slate-200 placeholder-slate-650 text-sm outline-none transition"
+                  className={`w-full bg-slate-950 border rounded-xl py-2.5 px-4 text-slate-200 placeholder-slate-650 text-sm outline-none transition focus:ring-1 ${
+                    errors.email 
+                      ? 'border-red-500/50 focus:border-red-500 focus:ring-red-500/30' 
+                      : 'border-slate-800 focus:border-primary-500 focus:ring-primary-500/30'
+                  }`}
+                  {...register('email', {
+                    required: 'Email is required',
+                    pattern: {
+                      value: /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/,
+                      message: 'Please enter a valid email address'
+                    }
+                  })}
                 />
+                {errors.email && (
+                  <p className="text-red-400 text-xs mt-1.5 font-medium">{errors.email.message}</p>
+                )}
               </div>
 
               <div>
                 <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Message</label>
                 <textarea
-                  required
                   rows="4"
                   placeholder="How can we help your team?"
-                  className="w-full bg-slate-950 border border-slate-800 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 rounded-xl py-2.5 px-4 text-slate-200 placeholder-slate-650 text-sm outline-none transition resize-none"
+                  className={`w-full bg-slate-950 border rounded-xl py-2.5 px-4 text-slate-200 placeholder-slate-650 text-sm outline-none transition resize-none focus:ring-1 ${
+                    errors.message 
+                      ? 'border-red-500/50 focus:border-red-500 focus:ring-red-500/30' 
+                      : 'border-slate-800 focus:border-primary-500 focus:ring-primary-500/30'
+                  }`}
+                  {...register('message', {
+                    required: 'Message is required',
+                    minLength: { value: 10, message: 'Message must be at least 10 characters' }
+                  })}
                 />
+                {errors.message && (
+                  <p className="text-red-400 text-xs mt-1.5 font-medium">{errors.message.message}</p>
+                )}
               </div>
 
               <button
                 type="submit"
-                className="w-full py-2.5 bg-primary-600 hover:bg-primary-500 text-white font-semibold text-sm rounded-xl transition duration-150 shadow-md shadow-primary-600/10"
+                disabled={isSubmitting}
+                className="w-full py-2.5 bg-primary-600 hover:bg-primary-500 disabled:bg-primary-750/70 disabled:cursor-not-allowed text-white font-semibold text-sm rounded-xl transition duration-150 shadow-md shadow-primary-600/10 flex items-center justify-center gap-2"
               >
-                Send Message
+                {isSubmitting ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    Sending...
+                  </>
+                ) : (
+                  'Send Message'
+                )}
               </button>
             </form>
           </div>
