@@ -44,6 +44,10 @@ const Employees = () => {
   const [formError, setFormError] = useState('');
   const [formLoading, setFormLoading] = useState(false);
 
+  const isEditingSelf = currentEmpId === currentUser?._id;
+  const isPersonalInfoDisabled = isEditMode && !isEditingSelf;
+  const isWorkInfoDisabled = isEditMode && isEditingSelf && !isAdmin;
+
   // Department Creation State
   const [newDeptName, setNewDeptName] = useState('');
   const [newDeptDesc, setNewDeptDesc] = useState('');
@@ -342,13 +346,15 @@ const Employees = () => {
                       {/* Actions */}
                       <td className="px-6 py-4 text-right">
                         <div className="flex items-center justify-end gap-2">
-                          <button
-                            onClick={() => openEditModal(emp)}
-                            className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white transition"
-                            title="Edit"
-                          >
-                            <Edit size={16} />
-                          </button>
+                          {(isAdmin || isHR) && (emp.role !== 'Admin' || emp._id === currentUser._id) && (
+                            <button
+                              onClick={() => openEditModal(emp)}
+                              className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white transition"
+                              title="Edit"
+                            >
+                              <Edit size={16} />
+                            </button>
+                          )}
                           {isAdmin && emp._id !== currentUser._id && (
                             <button
                               onClick={() => handleDeleteEmployee(emp._id)}
@@ -403,18 +409,20 @@ const Employees = () => {
                   alt="Avatar Preview" 
                   className="w-20 h-20 rounded-full object-cover border-2 border-slate-700 bg-slate-800"
                 />
-                <div>
-                  <label className="cursor-pointer px-4 py-2 bg-slate-800 hover:bg-slate-750 text-xs text-slate-200 hover:text-white font-semibold rounded-xl border border-slate-700 flex items-center gap-2">
-                    <Upload size={14} /> Upload Profile Photo
-                    <input 
-                      type="file" 
-                      accept="image/*" 
-                      onChange={handleImageChange} 
-                      className="hidden" 
-                    />
-                  </label>
-                  <p className="text-[10px] text-slate-500 mt-2">JPEG or PNG. Max file size: 5MB.</p>
-                </div>
+                {!isPersonalInfoDisabled && (
+                  <div>
+                    <label className="cursor-pointer px-4 py-2 bg-slate-800 hover:bg-slate-750 text-xs text-slate-200 hover:text-white font-semibold rounded-xl border border-slate-700 flex items-center gap-2">
+                      <Upload size={14} /> Upload Profile Photo
+                      <input 
+                        type="file" 
+                        accept="image/*" 
+                        onChange={handleImageChange} 
+                        className="hidden" 
+                      />
+                    </label>
+                    <p className="text-[10px] text-slate-500 mt-2">JPEG or PNG. Max file size: 5MB.</p>
+                  </div>
+                )}
               </div>
 
               {/* Grid Fields */}
@@ -427,7 +435,8 @@ const Employees = () => {
                     required
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 rounded-xl py-2.5 px-4 text-white text-sm outline-none transition"
+                    disabled={isPersonalInfoDisabled}
+                    className="w-full bg-slate-950 border border-slate-800 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 rounded-xl py-2.5 px-4 text-white text-sm outline-none transition disabled:opacity-50"
                   />
                 </div>
 
@@ -439,11 +448,12 @@ const Employees = () => {
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 rounded-xl py-2.5 px-4 text-white text-sm outline-none transition"
+                    disabled={isPersonalInfoDisabled}
+                    className="w-full bg-slate-950 border border-slate-800 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 rounded-xl py-2.5 px-4 text-white text-sm outline-none transition disabled:opacity-50"
                   />
                 </div>
 
-                {/* Password (Required for create, optional for edit) */}
+                 {/* Password (Required for create, optional for edit) */}
                 <div>
                   <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
                     Password {isEditMode && <span className="text-[10px] text-slate-500 font-normal">(Leave blank to keep current)</span>}
@@ -453,7 +463,8 @@ const Employees = () => {
                     required={!isEditMode}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 rounded-xl py-2.5 px-4 text-white text-sm outline-none transition"
+                    disabled={isPersonalInfoDisabled}
+                    className="w-full bg-slate-950 border border-slate-800 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 rounded-xl py-2.5 px-4 text-white text-sm outline-none transition disabled:opacity-50"
                   />
                 </div>
 
@@ -463,8 +474,8 @@ const Employees = () => {
                   <select
                     value={role}
                     onChange={(e) => setRole(e.target.value)}
-                    disabled={isHR && role === 'Admin'} // HR cannot set Admin
-                    className="w-full bg-slate-955 border border-slate-800 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 rounded-xl py-2.5 px-4 text-white text-sm outline-none transition cursor-pointer bg-slate-950"
+                    disabled={isWorkInfoDisabled || (isHR && role === 'Admin')}
+                    className="w-full bg-slate-955 border border-slate-800 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 rounded-xl py-2.5 px-4 text-white text-sm outline-none transition cursor-pointer bg-slate-950 disabled:opacity-50"
                   >
                     <option value="Employee">Employee</option>
                     <option value="HR">HR</option>
@@ -478,7 +489,8 @@ const Employees = () => {
                   <select
                     value={department}
                     onChange={(e) => setDepartment(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 rounded-xl py-2.5 px-4 text-white text-sm outline-none transition cursor-pointer"
+                    disabled={isWorkInfoDisabled}
+                    className="w-full bg-slate-950 border border-slate-800 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 rounded-xl py-2.5 px-4 text-white text-sm outline-none transition cursor-pointer disabled:opacity-50"
                   >
                     <option value="">Unassigned</option>
                     {departments.map(d => (
@@ -495,7 +507,8 @@ const Employees = () => {
                     value={position}
                     onChange={(e) => setPosition(e.target.value)}
                     placeholder="e.g. Lead Designer"
-                    className="w-full bg-slate-950 border border-slate-800 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 rounded-xl py-2.5 px-4 text-white text-sm outline-none transition"
+                    disabled={isWorkInfoDisabled}
+                    className="w-full bg-slate-950 border border-slate-800 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 rounded-xl py-2.5 px-4 text-white text-sm outline-none transition disabled:opacity-50"
                   />
                 </div>
 
@@ -506,7 +519,8 @@ const Employees = () => {
                     type="number"
                     value={salary}
                     onChange={(e) => setSalary(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 rounded-xl py-2.5 px-4 text-white text-sm outline-none transition"
+                    disabled={isWorkInfoDisabled}
+                    className="w-full bg-slate-950 border border-slate-800 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 rounded-xl py-2.5 px-4 text-white text-sm outline-none transition disabled:opacity-50"
                   />
                 </div>
               </div>

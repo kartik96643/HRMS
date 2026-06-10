@@ -580,13 +580,12 @@ const Landing = () => {
           {/* Contact Input Form */}
           <div className="glass p-6 md:p-8 rounded-3xl border border-slate-800/60 space-y-4">
             <h4 className="text-base font-bold text-white flex items-center gap-2"><MessageSquare size={16} className="text-primary-500" /> Send a Message</h4>
-            
+
             {submitStatus.message && (
-              <div className={`p-4 rounded-xl text-xs font-semibold border ${
-                submitStatus.success 
-                  ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' 
+              <div className={`p-4 rounded-xl text-xs font-semibold border ${submitStatus.success
+                  ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
                   : 'bg-red-500/10 border-red-500/20 text-red-400'
-              }`}>
+                }`}>
                 {submitStatus.message}
               </div>
             )}
@@ -597,11 +596,10 @@ const Landing = () => {
                 <input
                   type="text"
                   placeholder="John Doe"
-                  className={`w-full bg-slate-950 border rounded-xl py-2.5 px-4 text-slate-200 placeholder-slate-650 text-sm outline-none transition focus:ring-1 ${
-                    errors.name 
-                      ? 'border-red-500/50 focus:border-red-500 focus:ring-red-500/30' 
+                  className={`w-full bg-slate-950 border rounded-xl py-2.5 px-4 text-slate-200 placeholder-slate-650 text-sm outline-none transition focus:ring-1 ${errors.name
+                      ? 'border-red-500/50 focus:border-red-500 focus:ring-red-500/30'
                       : 'border-slate-800 focus:border-primary-500 focus:ring-primary-500/30'
-                  }`}
+                    }`}
                   {...register('name', {
                     required: 'Name is required',
                     minLength: { value: 2, message: 'Name must be at least 2 characters' }
@@ -617,11 +615,10 @@ const Landing = () => {
                 <input
                   type="email"
                   placeholder="john@company.com"
-                  className={`w-full bg-slate-950 border rounded-xl py-2.5 px-4 text-slate-200 placeholder-slate-650 text-sm outline-none transition focus:ring-1 ${
-                    errors.email 
-                      ? 'border-red-500/50 focus:border-red-500 focus:ring-red-500/30' 
+                  className={`w-full bg-slate-950 border rounded-xl py-2.5 px-4 text-slate-200 placeholder-slate-650 text-sm outline-none transition focus:ring-1 ${errors.email
+                      ? 'border-red-500/50 focus:border-red-500 focus:ring-red-500/30'
                       : 'border-slate-800 focus:border-primary-500 focus:ring-primary-500/30'
-                  }`}
+                    }`}
                   {...register('email', {
                     required: 'Email is required',
                     pattern: {
@@ -640,11 +637,10 @@ const Landing = () => {
                 <textarea
                   rows="4"
                   placeholder="How can we help your team?"
-                  className={`w-full bg-slate-950 border rounded-xl py-2.5 px-4 text-slate-200 placeholder-slate-650 text-sm outline-none transition resize-none focus:ring-1 ${
-                    errors.message 
-                      ? 'border-red-500/50 focus:border-red-500 focus:ring-red-500/30' 
+                  className={`w-full bg-slate-950 border rounded-xl py-2.5 px-4 text-slate-200 placeholder-slate-650 text-sm outline-none transition resize-none focus:ring-1 ${errors.message
+                      ? 'border-red-500/50 focus:border-red-500 focus:ring-red-500/30'
                       : 'border-slate-800 focus:border-primary-500 focus:ring-primary-500/30'
-                  }`}
+                    }`}
                   {...register('message', {
                     required: 'Message is required',
                     minLength: { value: 10, message: 'Message must be at least 10 characters' }

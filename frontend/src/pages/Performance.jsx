@@ -19,6 +19,7 @@ import {
 const Performance = () => {
   const { user: currentUser, isAdmin, isHR, isManager: isDeptManager } = useAuth();
   const isManager = isAdmin || isHR || isDeptManager;
+  const canWriteReview = isAdmin || isDeptManager;
 
   // Global lists
   const [employees, setEmployees] = useState([]);
@@ -203,9 +204,11 @@ const Performance = () => {
       <div>
         <h1 className="text-2xl font-extrabold text-white">Performance Management</h1>
         <p className="text-slate-400 text-sm mt-1">
-          {isManager
+          {canWriteReview
             ? 'Complete employee appraisals, track goals, and generate AI performance summaries.'
-            : 'Track your objectives, review feedback, and view AI developmental reports.'}
+            : isHR
+              ? 'Track employee performance reviews, logs, and developmental summaries.'
+              : 'Track your objectives, review feedback, and view AI developmental reports.'}
         </p>
       </div>
 
@@ -225,7 +228,7 @@ const Performance = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
 
           {/* MANAGER ONLY VIEW: WRITE APPRAISALS */}
-          {isManager && (
+          {canWriteReview && (
             <div className="lg:col-span-1 space-y-6">
 
               {/* Creator Card */}
@@ -391,7 +394,7 @@ const Performance = () => {
           )}
 
           {/* APPRAISALS HISTORY & OBJECTIVES VIEW */}
-          <div className={`${isManager ? 'lg:col-span-2' : 'lg:col-span-3'} space-y-6`}>
+          <div className={`${canWriteReview ? 'lg:col-span-2' : 'lg:col-span-3'} space-y-6`}>
 
             {/* Manager Filter Search Header */}
             {isManager && (
@@ -549,22 +552,32 @@ const Performance = () => {
                         </h5>
 
                         <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                          {rev.goals?.map((goal, idx) => (
-                            <div
-                              key={idx}
-                              onClick={() => handleToggleGoal(rev._id, idx, goal.status, rev.employee?._id)}
-                              className={`p-2.5 rounded-xl border cursor-pointer flex items-center justify-between text-xs transition ${goal.status === 'Completed'
-                                ? 'bg-emerald-500/5 border-emerald-500/15 text-emerald-400 line-through'
-                                : 'bg-slate-950 border-slate-850 text-slate-300 hover:border-slate-800'
-                                }`}
-                            >
-                              <span>{goal.text}</span>
-                              <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold ${goal.status === 'Completed' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-slate-800 text-slate-500'
+                          {rev.goals?.map((goal, idx) => {
+                            const canToggle = isAdmin || isDeptManager || currentUser?._id === rev.employee?._id;
+                            return (
+                              <div
+                                key={idx}
+                                onClick={() => {
+                                  if (canToggle) {
+                                    handleToggleGoal(rev._id, idx, goal.status, rev.employee?._id);
+                                  }
+                                }}
+                                className={`p-2.5 rounded-xl border flex items-center justify-between text-xs transition ${
+                                  canToggle ? 'cursor-pointer hover:border-slate-800' : 'cursor-default'
+                                } ${goal.status === 'Completed'
+                                  ? 'bg-emerald-500/5 border-emerald-500/15 text-emerald-400 line-through'
+                                  : 'bg-slate-950 border-slate-850 text-slate-300'
+                                  }`}
+                              >
+                                <span>{goal.text}</span>
+                                <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold ${
+                                  goal.status === 'Completed' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-slate-800 text-slate-500'
                                 }`}>
-                                {goal.status}
-                              </span>
-                            </div>
-                          ))}
+                                  {goal.status}
+                                </span>
+                              </div>
+                            );
+                          })}
                           {(!rev.goals || rev.goals.length === 0) && (
                             <p className="text-xs text-slate-500 italic">No developmental goals set for this period.</p>
                           )}

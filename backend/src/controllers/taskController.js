@@ -2,6 +2,7 @@ const Task = require('../models/Task');
 const User = require('../models/User');
 const Department = require('../models/Department');
 const Performance = require('../models/Performance');
+const Leave = require('../models/Leave');
 const { sendNotification } = require('../utils/notificationHelper');
 const { generatePerformanceSummary } = require('../utils/aiSummary');
 
@@ -54,7 +55,7 @@ const calculateTaskMetrics = async (userId, companyId) => {
 
 // @desc    Create a new task
 // @route   POST /api/tasks
-// @access  Private (Admin, HR, Manager)
+// @access  Private (Admin, Manager)
 const createTask = async (req, res) => {
   const { title, description, assignedTo, dueDate } = req.body;
 
@@ -66,6 +67,27 @@ const createTask = async (req, res) => {
     const assignee = await User.findOne({ _id: assignedTo, company: req.companyId });
     if (!assignee) {
       return res.status(404).json({ message: 'Assignee not found or access denied' });
+    }
+
+    // Check if the employee has an approved leave overlapping the task duration (from today to due date)
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const taskDueDate = new Date(dueDate);
+
+    const overlappingLeave = await Leave.findOne({
+      employee: assignedTo,
+      status: 'Approved',
+      company: req.companyId,
+      startDate: { $lte: taskDueDate },
+      endDate: { $gte: today }
+    });
+
+    if (overlappingLeave) {
+      const startStr = new Date(overlappingLeave.startDate).toISOString().split('T')[0];
+      const endStr = new Date(overlappingLeave.endDate).toISOString().split('T')[0];
+      return res.status(400).json({
+        message: `Employee is on leave from ${startStr} to ${endStr}`
+      });
     }
 
     // Role restrictions: Manager can only assign to employees in their own department
@@ -111,7 +133,7 @@ const getTasks = async (req, res) => {
   try {
     let filter = { company: req.companyId };
 
-    if (req.user.role === 'Employee') {
+    if (req.user.role === 'Employee' || req.user.role === 'HR') {
       filter.assignedTo = req.user._id;
     } else if (req.user.role === 'Manager') {
       // Find the department managed by this user
@@ -151,9 +173,9 @@ const updateTaskStatus = async (req, res) => {
       return res.status(404).json({ message: 'Task not found' });
     }
 
-    // Authorization: Only the assignee or Admin/HR can change status
+    // Authorization: Only the assignee or Admin/Manager can change status
     const isAssignee = task.assignedTo.toString() === req.user._id.toString();
-    const isManager = req.user.role === 'Admin' || req.user.role === 'HR';
+    const isManager = req.user.role === 'Admin' || req.user.role === 'Manager';
     if (!isAssignee && !isManager) {
       return res.status(403).json({ message: 'Not authorized to change this task status' });
     }
@@ -246,7 +268,7 @@ const reviewTask = async (req, res) => {
       return res.status(400).json({ message: 'Only completed tasks can be reviewed' });
     }
 
-    // Authorization: Only the assigner, or a Manager of that department, or Admin/HR
+    // Authorization: Only the assigner, or a Manager of that department, or Admin (HR is excluded)
     const isAssigner = task.assignedBy.toString() === req.user._id.toString();
     
     let isDeptManager = false;
@@ -255,9 +277,9 @@ const reviewTask = async (req, res) => {
       isDeptManager = dept && task.department?.toString() === dept._id.toString();
     }
     
-    const isAdminHR = req.user.role === 'Admin' || req.user.role === 'HR';
+    const isAdmin = req.user.role === 'Admin';
 
-    if (!isAssigner && !isDeptManager && !isAdminHR) {
+    if (!isAssigner && !isDeptManager && !isAdmin) {
       return res.status(403).json({ message: 'Not authorized to review this task' });
     }
 

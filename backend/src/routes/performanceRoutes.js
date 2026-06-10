@@ -9,7 +9,7 @@ const { protect } = require('../middleware/authMiddleware');
 const { authorize } = require('../middleware/roleMiddleware');
 
 router.route('/')
-  .post(protect, authorize('Admin', 'HR', 'Manager'), createReview);
+  .post(protect, authorize('Admin', 'Manager'), createReview);
 
 router.route('/employee/:userId')
   .get(protect, getEmployeeReviews);

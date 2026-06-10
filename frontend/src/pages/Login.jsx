@@ -60,7 +60,7 @@ const Login = () => {
 
       {/* Login Container */}
       <div className="w-full max-w-md glass rounded-3xl p-8 shadow-2xl relative z-10 border border-slate-800/80">
-        
+
         {/* Brand Logo */}
         <div className="flex flex-col items-center mb-8 text-center">
           <div className="w-14 h-14 bg-primary-600 rounded-2xl flex items-center justify-center text-white mb-4 shadow-xl shadow-primary-600/30">

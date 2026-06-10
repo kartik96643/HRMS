@@ -18,7 +18,7 @@ import {
 
 const Tasks = () => {
   const { user: currentUser } = useAuth();
-  const isSupervisor = currentUser?.role === 'Admin' || currentUser?.role === 'HR' || currentUser?.role === 'Manager';
+  const isSupervisor = currentUser?.role === 'Admin' || currentUser?.role === 'Manager';
 
   const [tasks, setTasks] = useState([]);
   const [employees, setEmployees] = useState([]);
@@ -288,12 +288,20 @@ const Tasks = () => {
                         <span className="flex items-center gap-1"><Calendar size={11} /> {new Date(task.dueDate).toLocaleDateString()}</span>
                       </div>
                       {!isSupervisor && (
-                        <button
-                          onClick={() => handleUpdateStatus(task._id, 'Completed')}
-                          className="w-full py-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg text-[9px] transition"
-                        >
-                          Submit to Review
-                        </button>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleUpdateStatus(task._id, 'Pending')}
+                            className="flex-1 py-1 bg-slate-800 hover:bg-slate-700 text-slate-350 hover:text-white font-bold rounded-lg text-[9px] transition border border-slate-700"
+                          >
+                            Revert
+                          </button>
+                          <button
+                            onClick={() => handleUpdateStatus(task._id, 'Completed')}
+                            className="flex-1 py-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg text-[9px] transition"
+                          >
+                            Submit
+                          </button>
+                        </div>
                       )}
                     </div>
                   </div>
@@ -330,8 +338,16 @@ const Tasks = () => {
                           Rate & Close Task
                         </button>
                       ) : (
-                        <div className="text-[9px] text-center italic text-amber-500 bg-amber-500/5 py-1 rounded border border-amber-500/10">
-                          Awaiting Manager Review
+                        <div className="space-y-1.5">
+                          <div className="text-[9px] text-center italic text-amber-500 bg-amber-500/5 py-1 rounded border border-amber-500/10">
+                            Awaiting Manager Review
+                          </div>
+                          <button
+                            onClick={() => handleUpdateStatus(task._id, 'In-Progress')}
+                            className="w-full py-1 bg-slate-800 hover:bg-slate-700 text-slate-350 hover:text-white font-bold rounded-lg text-[9px] transition border border-slate-700"
+                          >
+                            Revert to In-Progress
+                          </button>
                         </div>
                       )}
                     </div>

@@ -6,7 +6,7 @@ const { calculateTaskMetrics } = require('./taskController');
 
 // @desc    Create a performance review (triggers AI summary generator)
 // @route   POST /api/performance
-// @access  Private (Admin, HR, Manager)
+// @access  Private (Admin, Manager)
 const createReview = async (req, res) => {
   const { employee, goals, ratings, feedback } = req.body;
 
@@ -92,7 +92,7 @@ const getEmployeeReviews = async (req, res) => {
 
 // @desc    Update employee goal status
 // @route   PUT /api/performance/goal/:reviewId/:goalIndex
-// @access  Private (Admin, HR, Manager, Owner)
+// @access  Private (Admin, Manager, Owner)
 const updateGoalStatus = async (req, res) => {
   const { status } = req.body; // status: 'Pending' or 'Completed'
 
@@ -102,9 +102,9 @@ const updateGoalStatus = async (req, res) => {
       return res.status(404).json({ message: 'Performance record not found' });
     }
 
-    // Authorization: Admin, HR, Manager, or Owner
+    // Authorization: Admin, Manager, or Owner
     const isOwner = req.user._id.toString() === review.employee.toString();
-    const isManager = req.user.role === 'Admin' || req.user.role === 'HR' || req.user.role === 'Manager';
+    const isManager = req.user.role === 'Admin' || req.user.role === 'Manager';
 
     if (!isOwner && !isManager) {
       return res.status(403).json({ message: 'Not authorized to update this performance goal' });

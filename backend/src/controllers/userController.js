@@ -100,16 +100,38 @@ const updateUser = async (req, res) => {
       return res.status(404).json({ message: 'Employee not found' });
     }
 
-    // Authorization: Admin and HR can update anyone. Owner can update their own details but NOT role, salary, department, status.
     const isOwner = req.user._id.toString() === user._id.toString();
-    const isManager = req.user.role === 'Admin' || req.user.role === 'HR';
+    const isHR = req.user.role === 'HR';
+    const isAdmin = req.user.role === 'Admin';
+    const isEditor = isAdmin || isHR;
 
-    if (!isOwner && !isManager) {
+    // 1. Authorization: Only the owner, Admin, or HR can edit a profile.
+    if (!isOwner && !isEditor) {
       return res.status(403).json({ message: 'Not authorized to update this profile' });
     }
 
-    // Owner specific restrictions
-    if (isOwner && !isManager) {
+    // 2. "No one can edit the admin, only admin can edit their profile"
+    if (user.role === 'Admin' && !isOwner) {
+      return res.status(403).json({ message: 'No one can edit the admin, only admin can edit their profile' });
+    }
+
+    // 3. Admin and HR (as editors) can only edit: role, position, department, status, and salary of other users.
+    // They CANNOT edit password, email, name, or profileImage of other users.
+    if (!isOwner && isEditor) {
+      if (
+        (name && name !== user.name) ||
+        (email && email !== user.email) ||
+        (password && password.trim() !== '') ||
+        req.cloudinaryUrl
+      ) {
+        return res.status(403).json({
+          message: 'Admin and HR can only edit role, position, department, and salary of other employees; not their password, email, and name.'
+        });
+      }
+    }
+
+    // 4. Owners (non-admin) CANNOT edit their own role, status, department, position, or salary.
+    if (isOwner && !isAdmin) {
       if (role && role !== user.role) {
         return res.status(403).json({ message: 'You cannot change your own role' });
       }
@@ -122,10 +144,13 @@ const updateUser = async (req, res) => {
       if (salary && Number(salary) !== user.salary) {
         return res.status(403).json({ message: 'You cannot change your own salary' });
       }
+      if (position && position !== user.position) {
+        return res.status(403).json({ message: 'You cannot change your own position' });
+      }
     }
 
-    // Role restrictions: HR cannot change a user's role to Admin, or demote an Admin
-    if (req.user.role === 'HR') {
+    // 5. Role restrictions: HR cannot change a user's role to Admin, or demote an Admin
+    if (isHR) {
       if (role && role === 'Admin' && user.role !== 'Admin') {
         return res.status(403).json({ message: 'HR cannot assign Admin role' });
       }
@@ -134,32 +159,30 @@ const updateUser = async (req, res) => {
       }
     }
 
-    // Update fields
-    if (name) user.name = name;
-    if (email) user.email = email;
-    if (position) user.position = position;
-    
-    // Only update password if provided
-    if (password && password.trim() !== '') {
-      user.password = password; // Will be hashed in pre-save hook
+    // Update personal fields (Owner only)
+    if (isOwner) {
+      if (name) user.name = name;
+      if (email) user.email = email;
+      if (password && password.trim() !== '') {
+        user.password = password; // Will be hashed in pre-save hook
+      }
+      if (req.cloudinaryUrl) {
+        user.profileImage = req.cloudinaryUrl;
+      }
     }
 
-    // Manager only updates
-    if (isManager) {
+    // Update job/work fields (Editor only)
+    if (isEditor) {
       if (role) user.role = role;
       if (status) user.status = status;
       if (salary !== undefined) user.salary = Number(salary);
+      if (position) user.position = position;
       
       if (department === 'null' || department === '') {
         user.department = null;
       } else if (department) {
         user.department = department;
       }
-    }
-
-    // Profile photo upload
-    if (req.cloudinaryUrl) {
-      user.profileImage = req.cloudinaryUrl;
     }
 
     await user.save();
