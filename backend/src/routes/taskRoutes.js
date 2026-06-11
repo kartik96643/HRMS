@@ -5,7 +5,8 @@ const {
   getTasks,
   updateTaskStatus,
   reviewTask,
-  getEmployeeTaskMetrics
+  getEmployeeTaskMetrics,
+  reassignTask
 } = require('../controllers/taskController');
 const { protect } = require('../middleware/authMiddleware');
 const { authorize } = require('../middleware/roleMiddleware');
@@ -24,5 +25,8 @@ router.route('/:id/status')
 
 router.route('/:id/review')
   .put(protect, authorize('Admin', 'Manager'), reviewTask);
+
+router.route('/:id/reassign')
+  .put(protect, authorize('Admin', 'Manager'), reassignTask);
 
 module.exports = router;

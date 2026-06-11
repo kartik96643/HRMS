@@ -13,7 +13,8 @@ import {
   Calendar,
   Sparkles,
   Info,
-  X
+  X,
+  UserPlus
 } from 'lucide-react';
 
 const Tasks = () => {
@@ -29,6 +30,7 @@ const Tasks = () => {
   // Modals
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+  const [isReassignModalOpen, setIsReassignModalOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState(null);
 
   // Create Task Form State
@@ -46,6 +48,36 @@ const Tasks = () => {
   const [feedback, setFeedback] = useState('');
   const [reviewLoading, setReviewLoading] = useState(false);
 
+  // Reassign Task Form State
+  const [reassignEmployeeId, setReassignEmployeeId] = useState('');
+  const [reassignReason, setReassignReason] = useState('');
+  const [reassignLoading, setReassignLoading] = useState(false);
+  const [expandedHistories, setExpandedHistories] = useState({});
+
+  const canReassign = (task) => {
+    if (currentUser?.role === 'Admin') return true;
+    if (currentUser?.role === 'Manager') {
+      const taskDeptId = task.department?._id || task.department;
+      const userDeptId = currentUser.department?._id || currentUser.department;
+      return taskDeptId && userDeptId && taskDeptId.toString() === userDeptId.toString();
+    }
+    return false;
+  };
+
+  const toggleHistory = (taskId) => {
+    setExpandedHistories(prev => ({
+      ...prev,
+      [taskId]: !prev[taskId]
+    }));
+  };
+
+  const openReassignModal = (task) => {
+    setSelectedTask(task);
+    setReassignEmployeeId('');
+    setReassignReason('');
+    setIsReassignModalOpen(true);
+  };
+
   const fetchTasks = async () => {
     try {
       const { data } = await api.get('/tasks');
@@ -61,7 +93,11 @@ const Tasks = () => {
       const { data } = await api.get('/users');
       // Managers can only assign tasks to employees in their own department
       if (currentUser?.role === 'Manager') {
-        setEmployees(data.filter(emp => emp.department?._id === currentUser.department?._id && emp._id !== currentUser._id));
+        const userDeptId = currentUser.department?._id || currentUser.department;
+        setEmployees(data.filter(emp => {
+          const empDeptId = emp.department?._id || emp.department;
+          return empDeptId && userDeptId && empDeptId.toString() === userDeptId.toString() && emp._id !== currentUser._id;
+        }));
       } else {
         setEmployees(data.filter(emp => emp._id !== currentUser._id));
       }
@@ -172,6 +208,32 @@ const Tasks = () => {
     }
   };
 
+  // Handle task reassignment (Supervisor action)
+  const handleReassignTaskSubmit = async (e) => {
+    e.preventDefault();
+    if (!reassignEmployeeId || !reassignReason || !selectedTask) return;
+
+    setReassignLoading(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      const { data } = await api.put(`/tasks/${selectedTask._id}/reassign`, {
+        assignedTo: reassignEmployeeId,
+        reason: reassignReason
+      });
+      setTasks(tasks.map(t => t._id === selectedTask._id ? data : t));
+      setSuccess('Task reassigned successfully!');
+      setIsReassignModalOpen(false);
+      setSelectedTask(null);
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to reassign task');
+    } finally {
+      setReassignLoading(false);
+    }
+  };
+
   // Grouping helpers
   const pendingTasks = tasks.filter(t => t.status === 'Pending');
   const progressTasks = tasks.filter(t => t.status === 'In-Progress');
@@ -252,13 +314,60 @@ const Tasks = () => {
                         <span className="flex items-center gap-1"><User size={11} /> {task.assignedTo?.name}</span>
                         <span className="flex items-center gap-1"><Calendar size={11} /> {new Date(task.dueDate).toLocaleDateString()}</span>
                       </div>
-                      {!isSupervisor && (
+                      {!isSupervisor ? (
                         <button
                           onClick={() => handleUpdateStatus(task._id, 'In-Progress')}
                           className="w-full py-1 bg-sky-600 hover:bg-sky-500 text-white font-bold rounded-lg text-[9px] transition"
                         >
                           Start Work
                         </button>
+                      ) : (
+                        canReassign(task) && (
+                          <button
+                            onClick={() => openReassignModal(task)}
+                            className="w-full py-1 bg-slate-800 hover:bg-slate-700 text-slate-350 hover:text-white font-semibold rounded-lg text-[9px] transition border border-slate-700 flex items-center justify-center gap-1 cursor-pointer"
+                          >
+                            <UserPlus size={10} /> Reassign Task
+                          </button>
+                        )
+                      )}
+                      {isSupervisor && task.assignmentHistory && task.assignmentHistory.length > 0 && (
+                        <div className="mt-2 pt-2 border-t border-slate-200/40 dark:border-slate-800/40">
+                          <button
+                            type="button"
+                            onClick={() => toggleHistory(task._id)}
+                            className="text-[9px] font-bold text-primary-400 hover:text-primary-300 flex items-center gap-1 cursor-pointer"
+                          >
+                            <Clock size={10} /> 
+                            {expandedHistories[task._id] ? 'Hide History' : `History (${task.assignmentHistory.length})`}
+                          </button>
+                          
+                          {expandedHistories[task._id] && (
+                            <div className="mt-2 space-y-2 bg-slate-950/40 p-2 rounded-lg border border-slate-850 max-h-[120px] overflow-y-auto text-left">
+                              {task.assignmentHistory.map((hist, index) => (
+                                <div key={hist._id || index} className="relative pl-3 border-l border-primary-500/30 text-[8px] leading-relaxed">
+                                  <div className="absolute w-1 h-1 bg-primary-500 rounded-full -left-[2.5px] top-1"></div>
+                                  <p className="font-semibold text-slate-300">
+                                    {hist.action === 'Created' ? 'Created & Assigned to' : 'Reassigned to'}: <span className="text-white font-bold">{hist.employee?.name}</span>
+                                  </p>
+                                  {hist.action === 'Reassigned' && hist.previousEmployee && (
+                                    <p className="text-slate-550">
+                                      Replaced: <span className="font-bold text-slate-400">{hist.previousEmployee?.name}</span> (State: <span className="italic text-slate-455">{hist.statusAtAssignment}</span>)
+                                    </p>
+                                  )}
+                                  <p className="text-slate-500">
+                                    By: {hist.assignedBy?.name} on {new Date(hist.assignedAt).toLocaleDateString()}
+                                  </p>
+                                  {hist.reason && (
+                                    <p className="italic text-primary-400/95 mt-0.5 font-medium">
+                                      "{hist.reason}"
+                                    </p>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       )}
                     </div>
                   </div>
@@ -287,7 +396,7 @@ const Tasks = () => {
                         <span className="flex items-center gap-1"><User size={11} /> {task.assignedTo?.name}</span>
                         <span className="flex items-center gap-1"><Calendar size={11} /> {new Date(task.dueDate).toLocaleDateString()}</span>
                       </div>
-                      {!isSupervisor && (
+                      {!isSupervisor ? (
                         <div className="flex gap-2">
                           <button
                             onClick={() => handleUpdateStatus(task._id, 'Pending')}
@@ -301,6 +410,53 @@ const Tasks = () => {
                           >
                             Submit
                           </button>
+                        </div>
+                      ) : (
+                        canReassign(task) && (
+                          <button
+                            onClick={() => openReassignModal(task)}
+                            className="w-full py-1 bg-slate-800 hover:bg-slate-700 text-slate-350 hover:text-white font-semibold rounded-lg text-[9px] transition border border-slate-700 flex items-center justify-center gap-1 cursor-pointer"
+                          >
+                            <UserPlus size={10} /> Reassign Task
+                          </button>
+                        )
+                      )}
+                      {isSupervisor && task.assignmentHistory && task.assignmentHistory.length > 0 && (
+                        <div className="mt-2 pt-2 border-t border-slate-200/40 dark:border-slate-850/40">
+                          <button
+                            type="button"
+                            onClick={() => toggleHistory(task._id)}
+                            className="text-[9px] font-bold text-primary-400 hover:text-primary-300 flex items-center gap-1 cursor-pointer"
+                          >
+                            <Clock size={10} /> 
+                            {expandedHistories[task._id] ? 'Hide History' : `History (${task.assignmentHistory.length})`}
+                          </button>
+                          
+                          {expandedHistories[task._id] && (
+                            <div className="mt-2 space-y-2 bg-slate-950/40 p-2 rounded-lg border border-slate-850 max-h-[120px] overflow-y-auto text-left">
+                              {task.assignmentHistory.map((hist, index) => (
+                                <div key={hist._id || index} className="relative pl-3 border-l border-primary-500/30 text-[8px] leading-relaxed">
+                                  <div className="absolute w-1 h-1 bg-primary-500 rounded-full -left-[2.5px] top-1"></div>
+                                  <p className="font-semibold text-slate-300">
+                                    {hist.action === 'Created' ? 'Created & Assigned to' : 'Reassigned to'}: <span className="text-white font-bold">{hist.employee?.name}</span>
+                                  </p>
+                                  {hist.action === 'Reassigned' && hist.previousEmployee && (
+                                    <p className="text-slate-550">
+                                      Replaced: <span className="font-bold text-slate-400">{hist.previousEmployee?.name}</span> (State: <span className="italic text-slate-455">{hist.statusAtAssignment}</span>)
+                                    </p>
+                                  )}
+                                  <p className="text-slate-500">
+                                    By: {hist.assignedBy?.name} on {new Date(hist.assignedAt).toLocaleDateString()}
+                                  </p>
+                                  {hist.reason && (
+                                    <p className="italic text-primary-400/95 mt-0.5 font-medium">
+                                      "{hist.reason}"
+                                    </p>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -331,12 +487,22 @@ const Tasks = () => {
                         <span className="flex items-center gap-1"><Calendar size={11} /> {new Date(task.dueDate).toLocaleDateString()}</span>
                       </div>
                       {isSupervisor ? (
-                        <button
-                          onClick={() => openReviewModal(task)}
-                          className="w-full py-1.5 bg-amber-600 hover:bg-amber-505 text-white font-bold rounded-lg text-[9px] transition bg-amber-550 hover:bg-amber-500"
-                        >
-                          Rate & Close Task
-                        </button>
+                        <div className="space-y-1.5">
+                          <button
+                            onClick={() => openReviewModal(task)}
+                            className="w-full py-1.5 bg-amber-600 hover:bg-amber-505 text-white font-bold rounded-lg text-[9px] transition bg-amber-550 hover:bg-amber-500 cursor-pointer"
+                          >
+                            Rate & Close Task
+                          </button>
+                          {canReassign(task) && (
+                            <button
+                              onClick={() => openReassignModal(task)}
+                              className="w-full py-1 bg-slate-800 hover:bg-slate-700 text-slate-350 hover:text-white font-semibold rounded-lg text-[9px] transition border border-slate-700 flex items-center justify-center gap-1 cursor-pointer"
+                            >
+                              <UserPlus size={10} /> Reassign Task
+                            </button>
+                          )}
+                        </div>
                       ) : (
                         <div className="space-y-1.5">
                           <div className="text-[9px] text-center italic text-amber-500 bg-amber-500/5 py-1 rounded border border-amber-500/10">
@@ -348,6 +514,44 @@ const Tasks = () => {
                           >
                             Revert to In-Progress
                           </button>
+                        </div>
+                      )}
+                      {isSupervisor && task.assignmentHistory && task.assignmentHistory.length > 0 && (
+                        <div className="mt-2 pt-2 border-t border-slate-200/40 dark:border-slate-850/40">
+                          <button
+                            type="button"
+                            onClick={() => toggleHistory(task._id)}
+                            className="text-[9px] font-bold text-primary-400 hover:text-primary-300 flex items-center gap-1 cursor-pointer"
+                          >
+                            <Clock size={10} /> 
+                            {expandedHistories[task._id] ? 'Hide History' : `History (${task.assignmentHistory.length})`}
+                          </button>
+                          
+                          {expandedHistories[task._id] && (
+                            <div className="mt-2 space-y-2 bg-slate-950/40 p-2 rounded-lg border border-slate-850 max-h-[120px] overflow-y-auto text-left">
+                              {task.assignmentHistory.map((hist, index) => (
+                                <div key={hist._id || index} className="relative pl-3 border-l border-primary-500/30 text-[8px] leading-relaxed">
+                                  <div className="absolute w-1 h-1 bg-primary-500 rounded-full -left-[2.5px] top-1"></div>
+                                  <p className="font-semibold text-slate-300">
+                                    {hist.action === 'Created' ? 'Created & Assigned to' : 'Reassigned to'}: <span className="text-white font-bold">{hist.employee?.name}</span>
+                                  </p>
+                                  {hist.action === 'Reassigned' && hist.previousEmployee && (
+                                    <p className="text-slate-550">
+                                      Replaced: <span className="font-bold text-slate-400">{hist.previousEmployee?.name}</span> (State: <span className="italic text-slate-455">{hist.statusAtAssignment}</span>)
+                                    </p>
+                                  )}
+                                  <p className="text-slate-500">
+                                    By: {hist.assignedBy?.name} on {new Date(hist.assignedAt).toLocaleDateString()}
+                                  </p>
+                                  {hist.reason && (
+                                    <p className="italic text-primary-400/95 mt-0.5 font-medium">
+                                      "{hist.reason}"
+                                    </p>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -383,6 +587,44 @@ const Tasks = () => {
                         <span>To: {task.assignedTo?.name}</span>
                         <span>By: {task.assignedBy?.name}</span>
                       </div>
+                      {isSupervisor && task.assignmentHistory && task.assignmentHistory.length > 0 && (
+                        <div className="mt-2 pt-2 border-t border-slate-200/40 dark:border-slate-850/40">
+                          <button
+                            type="button"
+                            onClick={() => toggleHistory(task._id)}
+                            className="text-[9px] font-bold text-primary-400 hover:text-primary-300 flex items-center gap-1 cursor-pointer"
+                          >
+                            <Clock size={10} /> 
+                            {expandedHistories[task._id] ? 'Hide History' : `History (${task.assignmentHistory.length})`}
+                          </button>
+                          
+                          {expandedHistories[task._id] && (
+                            <div className="mt-2 space-y-2 bg-slate-950/40 p-2 rounded-lg border border-slate-850 max-h-[120px] overflow-y-auto text-left">
+                              {task.assignmentHistory.map((hist, index) => (
+                                <div key={hist._id || index} className="relative pl-3 border-l border-primary-500/30 text-[8px] leading-relaxed">
+                                  <div className="absolute w-1 h-1 bg-primary-500 rounded-full -left-[2.5px] top-1"></div>
+                                  <p className="font-semibold text-slate-300">
+                                    {hist.action === 'Created' ? 'Created & Assigned to' : 'Reassigned to'}: <span className="text-white font-bold">{hist.employee?.name}</span>
+                                  </p>
+                                  {hist.action === 'Reassigned' && hist.previousEmployee && (
+                                    <p className="text-slate-550">
+                                      Replaced: <span className="font-bold text-slate-400">{hist.previousEmployee?.name}</span> (State: <span className="italic text-slate-455">{hist.statusAtAssignment}</span>)
+                                    </p>
+                                  )}
+                                  <p className="text-slate-500">
+                                    By: {hist.assignedBy?.name} on {new Date(hist.assignedAt).toLocaleDateString()}
+                                  </p>
+                                  {hist.reason && (
+                                    <p className="italic text-primary-400/95 mt-0.5 font-medium">
+                                      "{hist.reason}"
+                                    </p>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -579,6 +821,67 @@ const Tasks = () => {
                   className="px-4 py-2 bg-primary-600 hover:bg-primary-500 disabled:bg-primary-750 text-white rounded-xl text-xs font-semibold transition"
                 >
                   {reviewLoading ? 'Submitting...' : 'Submit Grade & Close'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 3: Reassign Task */}
+      {isReassignModalOpen && selectedTask && (
+        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl relative text-left">
+            <button onClick={() => { setIsReassignModalOpen(false); setSelectedTask(null); }} className="absolute top-6 right-6 text-slate-400 hover:text-white">
+              <X size={20} />
+            </button>
+            <h2 className="text-xl font-bold text-white mb-2">Reassign Task</h2>
+            <p className="text-[11px] text-slate-400 mb-6">Task: <span className="text-white font-bold">{selectedTask.title}</span></p>
+
+            <form onSubmit={handleReassignTaskSubmit} className="space-y-4">
+              <div>
+                <label className="block text-[10px] font-semibold text-slate-400 uppercase mb-2">Reassign To</label>
+                <select
+                  required
+                  value={reassignEmployeeId}
+                  onChange={(e) => setReassignEmployeeId(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 focus:border-primary-500 rounded-xl py-2.5 px-3 text-white text-xs outline-none cursor-pointer"
+                >
+                  <option value="">Choose Employee...</option>
+                  {employees
+                    .filter(emp => emp._id !== selectedTask.assignedTo?._id)
+                    .map(emp => (
+                      <option key={emp._id} value={emp._id}>{emp.name} ({emp.position})</option>
+                    ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-semibold text-slate-400 uppercase mb-2">Reason for Reassignment</label>
+                <textarea
+                  required
+                  rows="3"
+                  value={reassignReason}
+                  onChange={(e) => setReassignReason(e.target.value)}
+                  placeholder="Provide reason for reassigning this task..."
+                  className="w-full bg-slate-950 border border-slate-800 focus:border-primary-500 rounded-xl py-2 px-3 text-white text-xs outline-none resize-none transition"
+                />
+              </div>
+
+              <div className="flex gap-4 pt-4 border-t border-slate-850 justify-end">
+                <button
+                  type="button"
+                  onClick={() => { setIsReassignModalOpen(false); setSelectedTask(null); }}
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={reassignLoading}
+                  className="px-4 py-2 bg-primary-600 hover:bg-primary-500 disabled:bg-primary-750 text-white rounded-xl text-xs font-semibold transition"
+                >
+                  {reassignLoading ? 'Reassigning...' : 'Confirm Reassign'}
                 </button>
               </div>
             </form>

@@ -25,6 +25,18 @@ const Landing = () => {
   const { user } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
+  // Scroll to hash element on load
+  React.useEffect(() => {
+    if (window.location.hash) {
+      const element = document.querySelector(window.location.hash);
+      if (element) {
+        setTimeout(() => {
+          element.scrollIntoView({ behavior: 'smooth' });
+        }, 150);
+      }
+    }
+  }, []);
+
   // Accordion state for FAQs
   const [openFaq, setOpenFaq] = useState(null);
 

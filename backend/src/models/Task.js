@@ -47,6 +47,42 @@ const taskSchema = new mongoose.Schema({
     type: String,
     trim: true,
   },
+  assignmentHistory: [
+    {
+      employee: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        required: true,
+      },
+      previousEmployee: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        default: null,
+      },
+      assignedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        required: true,
+      },
+      assignedAt: {
+        type: Date,
+        default: Date.now,
+      },
+      action: {
+        type: String,
+        enum: ['Created', 'Reassigned'],
+        required: true,
+      },
+      statusAtAssignment: {
+        type: String,
+        required: true,
+      },
+      reason: {
+        type: String,
+        trim: true,
+      }
+    }
+  ],
   company: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Company',

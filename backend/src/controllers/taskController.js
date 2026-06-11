@@ -106,6 +106,15 @@ const createTask = async (req, res) => {
       department: assignee.department,
       dueDate,
       company: req.companyId,
+      assignmentHistory: [{
+        employee: assignedTo,
+        previousEmployee: null,
+        assignedBy: req.user._id,
+        assignedAt: new Date(),
+        action: 'Created',
+        statusAtAssignment: 'Pending',
+        reason: 'Initial Assignment'
+      }]
     });
 
     // Notify employee about new task
@@ -118,7 +127,19 @@ const createTask = async (req, res) => {
 
     const populatedTask = await Task.findOne({ _id: task._id, company: req.companyId })
       .populate('assignedTo', 'name email position')
-      .populate('assignedBy', 'name email position');
+      .populate('assignedBy', 'name email position')
+      .populate({
+        path: 'assignmentHistory.employee',
+        select: 'name email position'
+      })
+      .populate({
+        path: 'assignmentHistory.previousEmployee',
+        select: 'name email position'
+      })
+      .populate({
+        path: 'assignmentHistory.assignedBy',
+        select: 'name email position'
+      });
 
     res.status(201).json(populatedTask);
   } catch (error) {
@@ -149,6 +170,18 @@ const getTasks = async (req, res) => {
     const tasks = await Task.find(filter)
       .populate('assignedTo', 'name email position department')
       .populate('assignedBy', 'name email position')
+      .populate({
+        path: 'assignmentHistory.employee',
+        select: 'name email position'
+      })
+      .populate({
+        path: 'assignmentHistory.previousEmployee',
+        select: 'name email position'
+      })
+      .populate({
+        path: 'assignmentHistory.assignedBy',
+        select: 'name email position'
+      })
       .sort({ createdAt: -1 });
 
     res.json(tasks);
@@ -201,7 +234,19 @@ const updateTaskStatus = async (req, res) => {
 
     const populatedTask = await Task.findOne({ _id: task._id, company: req.companyId })
       .populate('assignedTo', 'name email position department')
-      .populate('assignedBy', 'name email position');
+      .populate('assignedBy', 'name email position')
+      .populate({
+        path: 'assignmentHistory.employee',
+        select: 'name email position'
+      })
+      .populate({
+        path: 'assignmentHistory.previousEmployee',
+        select: 'name email position'
+      })
+      .populate({
+        path: 'assignmentHistory.assignedBy',
+        select: 'name email position'
+      });
 
     res.json(populatedTask);
   } catch (error) {
@@ -320,7 +365,19 @@ const reviewTask = async (req, res) => {
 
     const populatedTask = await Task.findOne({ _id: task._id, company: req.companyId })
       .populate('assignedTo', 'name email position department')
-      .populate('assignedBy', 'name email position');
+      .populate('assignedBy', 'name email position')
+      .populate({
+        path: 'assignmentHistory.employee',
+        select: 'name email position'
+      })
+      .populate({
+        path: 'assignmentHistory.previousEmployee',
+        select: 'name email position'
+      })
+      .populate({
+        path: 'assignmentHistory.assignedBy',
+        select: 'name email position'
+      });
 
     res.json(populatedTask);
   } catch (error) {
@@ -354,6 +411,119 @@ const getEmployeeTaskMetrics = async (req, res) => {
   }
 };
 
+// @desc    Reassign an active task
+// @route   PUT /api/tasks/:id/reassign
+// @access  Private (Admin, Manager)
+const reassignTask = async (req, res) => {
+  const { assignedTo, reason } = req.body;
+
+  try {
+    if (!assignedTo) {
+      return res.status(400).json({ message: 'Assignee is required' });
+    }
+
+    const task = await Task.findOne({ _id: req.params.id, company: req.companyId });
+    if (!task) {
+      return res.status(404).json({ message: 'Task not found' });
+    }
+
+    // A task can only be reassigned if it has not been completed AND reviewed (or is not reviewed yet)
+    if (task.rating !== undefined) {
+      return res.status(400).json({ message: 'Cannot reassign a task that has already been closed and reviewed' });
+    }
+
+    const assignee = await User.findOne({ _id: assignedTo, company: req.companyId });
+    if (!assignee) {
+      return res.status(404).json({ message: 'Assignee not found or access denied' });
+    }
+
+    // Role restrictions: Manager can only reassign to employees in their own department
+    if (req.user.role === 'Manager') {
+      const dept = await Department.findOne({ manager: req.user._id, company: req.companyId });
+      if (!dept || task.department.toString() !== dept._id.toString() || assignee.department?.toString() !== dept._id.toString()) {
+        return res.status(403).json({ message: 'Managers can only reassign tasks within their own department' });
+      }
+    }
+
+    // Check if the employee has an approved leave overlapping the task duration (from today to due date)
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const taskDueDate = new Date(task.dueDate);
+
+    const overlappingLeave = await Leave.findOne({
+      employee: assignedTo,
+      status: 'Approved',
+      company: req.companyId,
+      startDate: { $lte: taskDueDate },
+      endDate: { $gte: today }
+    });
+
+    if (overlappingLeave) {
+      const startStr = new Date(overlappingLeave.startDate).toISOString().split('T')[0];
+      const endStr = new Date(overlappingLeave.endDate).toISOString().split('T')[0];
+      return res.status(400).json({
+        message: `Employee is on leave from ${startStr} to ${endStr}`
+      });
+    }
+
+    const oldAssigneeId = task.assignedTo;
+
+    // Push to assignmentHistory
+    task.assignmentHistory.push({
+      employee: assignedTo,
+      previousEmployee: oldAssigneeId,
+      assignedBy: req.user._id,
+      assignedAt: new Date(),
+      action: 'Reassigned',
+      statusAtAssignment: task.status,
+      reason: reason || 'Priority/Staff reassignment'
+    });
+
+    // Update assignment details
+    task.assignedTo = assignedTo;
+    task.status = 'Pending';
+    task.completedAt = undefined;
+
+    await task.save();
+
+    // Notify new employee
+    await sendNotification(
+      assignedTo,
+      'TaskAssigned',
+      `You have been reassigned a task: "${task.title}" by ${req.user.name}. Reason: ${reason || 'Not specified'}`,
+      req.companyId
+    );
+
+    // Notify old employee
+    await sendNotification(
+      oldAssigneeId,
+      'TaskReassigned',
+      `The task "${task.title}" previously assigned to you has been reassigned to ${assignee.name} by ${req.user.name}`,
+      req.companyId
+    );
+
+    const populatedTask = await Task.findOne({ _id: task._id, company: req.companyId })
+      .populate('assignedTo', 'name email position department')
+      .populate('assignedBy', 'name email position')
+      .populate({
+        path: 'assignmentHistory.employee',
+        select: 'name email position'
+      })
+      .populate({
+        path: 'assignmentHistory.previousEmployee',
+        select: 'name email position'
+      })
+      .populate({
+        path: 'assignmentHistory.assignedBy',
+        select: 'name email position'
+      });
+
+    res.json(populatedTask);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
 module.exports = {
   createTask,
   getTasks,
@@ -361,4 +531,5 @@ module.exports = {
   reviewTask,
   getEmployeeTaskMetrics,
   calculateTaskMetrics,
+  reassignTask,
 };

@@ -133,7 +133,7 @@ const Login = () => {
 
         <p className="text-center text-xs text-slate-400 mt-6">
           Don't have a company account?{' '}
-          <Link to="/register-company" className="text-primary-400 hover:text-primary-300 font-bold hover:underline transition">
+          <Link to="/#pricing" className="text-primary-400 hover:text-primary-300 font-bold hover:underline transition">
             Register Company
           </Link>
         </p>

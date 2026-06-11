@@ -102,7 +102,7 @@ const AppRoutes = () => {
     <Routes>
       <Route path="/" element={<Landing />} />
       <Route path="/login" element={<Login />} />
-      <Route path="/register-company" element={<RegisterCompany />} />
+      <Route path="/register-company" element={<Navigate to="/#pricing" replace />} />
       <Route path="/unauthorized" element={<Unauthorized />} />
       
       {/* Protected routes */}
